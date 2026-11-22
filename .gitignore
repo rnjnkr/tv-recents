@@ -1,0 +1,23 @@
+# Local notes: specs, plans, reviews (never committed)
+notes/
+
+# Android / Gradle
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Android Studio
+.idea/
+*.iml
+
+# Signing (never commit)
+keystore.properties
+*.jks
+*.keystore
+
+.DS_Store
