@@ -5,7 +5,7 @@ set -e
 cd "${0:A:h}/.."
 SDK="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 BT="$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)"
-KS="${KEYSTORE:-$HOME/.android/tv-recents-release.jks}"
+KS="${KEYSTORE:-$HOME/keystores/tv-recents-release.jks}"
 VERSION="$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)"
 OUT=app/build/outputs/apk/release
 APK="$OUT/tv-recents-v$VERSION.apk"

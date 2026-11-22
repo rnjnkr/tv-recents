@@ -39,7 +39,7 @@ Requires JDK 17+ and the Android SDK (set `sdk.dir` in `local.properties`).
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-To make a signed release APK, run `scripts/sign-release.sh`. It builds, creates a keystore on first run in `~/.android/`, and asks for the password. Back that keystore up.
+To make a signed release APK, run `scripts/sign-release.sh`. It builds, creates a keystore on first run in `~/keystores/`, and asks for the password. Back that keystore up.
 
 Debug builds also accept `adb shell am broadcast -a dev.ranjan.tvrecents.DEBUG_HOME --ei ms 700`, which feeds a Home press of that length (in milliseconds) into the app. Keys sent with `adb shell input` skip accessibility services, so this is the only way to drive the hold without the physical remote. It needs the `DUMP` permission, which only adb has, and is inert in release builds.
 
