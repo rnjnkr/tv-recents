@@ -22,3 +22,6 @@ keystore.properties
 *.keystore
 
 .DS_Store
+
+# Local signing key (the repo is public: never commit it)
+keystore/

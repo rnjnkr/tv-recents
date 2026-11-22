@@ -4,6 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="#55000000"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:defaultFocusHighlightEnabled="false"
     android:descendantFocusability="beforeDescendants"
     android:focusable="true"
@@ -14,6 +16,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:clipChildren="false"
+        android:clipToPadding="false"
         android:focusable="false"
         android:scrollbars="none">
 
@@ -38,4 +41,20 @@
         android:textColor="#FFFFFF"
         android:textSize="22sp"
         android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/switcher_app_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/switcher_app_info_chip"
+        android:defaultFocusHighlightEnabled="false"
+        android:elevation="8dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="10dp"
+        android:text="@string/app_info"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:visibility="invisible" />
 </view>

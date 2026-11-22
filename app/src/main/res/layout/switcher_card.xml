@@ -1,20 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<view xmlns:android="http://schemas.android.com/apk/res/android"
+    class="dev.ranjan.tvrecents.SwitcherCard"
     android:layout_width="160dp"
     android:layout_height="90dp"
     android:layout_marginHorizontal="8dp"
-    android:background="#28364D"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:defaultFocusHighlightEnabled="false"
     android:focusable="true"
-    android:focusableInTouchMode="true"
-    android:foreground="@drawable/switcher_card_focus">
+    android:focusableInTouchMode="true">
+
+    <FrameLayout
+        android:id="@+id/card_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/switcher_card_bg"
+        android:clipToOutline="true"
+        android:outlineProvider="background">
+
 
     <ImageView
         android:id="@+id/card_banner"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:importantForAccessibility="no"
-        android:scaleType="fitCenter"
+        android:scaleType="centerCrop"
         android:visibility="gone" />
 
     <LinearLayout
@@ -43,4 +53,25 @@
             android:textColor="#FFFFFF"
             android:textSize="16sp" />
     </LinearLayout>
-</FrameLayout>
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/card_glow"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="-6dp"
+        android:importantForAccessibility="noHideDescendants"
+        android:visibility="invisible">
+
+        <View
+            android:id="@+id/card_halo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <View
+            android:id="@+id/card_ring"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_margin="3dp" />
+    </FrameLayout>
+</view>

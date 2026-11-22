@@ -12,7 +12,8 @@ Google TV has no recents screen, so switching apps normally means Home, scroll t
 - **Hold Home (about half a second):** opens a translucent bar at the bottom of the screen with your recently used apps, most recent first (up to 8).
   - Left and right move between apps and wrap around at both ends.
   - OK opens the selected app, back where you left it if the app keeps its state.
-  - Back closes the bar. It also closes by itself after 10 seconds without input.
+  - Hold OK on a card to get an **App info** chip beside it; OK on the chip opens that app's info page.
+  - Back closes the bar (or just the chip). It also closes by itself after 10 seconds without input.
   - If you are inside an app, focus starts on the previous app, so "hold Home, OK" flips between your last two apps.
 
 The hold replaces Google TV's own long-press Home panel (settings, profiles, inputs), which is still reachable from the gear icon on the home screen.
@@ -39,7 +40,7 @@ Requires JDK 17+ and the Android SDK (set `sdk.dir` in `local.properties`).
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-To make a signed release APK, run `scripts/sign-release.sh`. It builds, creates a keystore on first run in `~/keystores/`, and asks for the password. Back that keystore up.
+To make a signed release APK, run `scripts/sign-release.sh`. For a prompt-free run, do the one-time `scripts/setup-signing.sh` first: it copies your keystore into `keystore/` and saves its password in `keystore.properties`. Both are git-ignored and must never be committed, because anyone with the key can sign APKs as this app. Without them the script uses `~/keystores/`, creates a key on first run and asks for the password. Back that key up.
 
 Debug builds also accept `adb shell am broadcast -a dev.ranjan.tvrecents.DEBUG_HOME --ei ms 700`, which feeds a Home press of that length (in milliseconds) into the app. Keys sent with `adb shell input` skip accessibility services, so this is the only way to drive the hold without the physical remote. It needs the `DUMP` permission, which only adb has, and is inert in release builds.
 

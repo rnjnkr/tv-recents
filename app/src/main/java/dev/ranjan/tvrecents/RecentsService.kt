@@ -6,9 +6,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
@@ -26,7 +28,7 @@ class RecentsService : AccessibilityService(), HomeActions {
         clearSession()
         val facts = AndroidPackageFacts(this)
         tracker = RecentsTracker(PrefsMruStore(this), PackageRules(packageName, facts), facts)
-        overlay = SwitcherOverlay(this, ::launchApp)
+        overlay = SwitcherOverlay(this, ::launchApp, ::openAppInfo)
         registerDebugHomePress()
     }
 
@@ -106,7 +108,8 @@ class RecentsService : AccessibilityService(), HomeActions {
 
     /**
      * Debug builds only: `adb shell am broadcast -a dev.ranjan.tvrecents.DEBUG_HOME --ei ms 700`
-     * feeds a Home press of that length into the handler. Injected keys skip accessibility key
+     * feeds a Home press of that length into the handler; add `--es key ok` to press OK in the
+     * open switcher instead. Injected keys skip accessibility key
      * filters, so this is the only way to drive the hold path without the physical remote.
      * Needs the DUMP permission, which adb has and other apps don't.
      */
@@ -115,6 +118,10 @@ class RecentsService : AccessibilityService(), HomeActions {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val ms = intent.getIntExtra("ms", 700).toLong()
+                if (intent.getStringExtra("key") == "ok") {
+                    overlay?.debugKey(KeyEvent.KEYCODE_DPAD_CENTER, ms)
+                    return
+                }
                 val down = SystemClock.uptimeMillis()
                 homeKeyHandler.onHomeKey(KeyEvent.ACTION_DOWN, 0, down, down, false)
                 mainHandler.postAtTime({
@@ -158,6 +165,17 @@ class RecentsService : AccessibilityService(), HomeActions {
             Log.w(TAG, "Could not launch $pkg", e)
         }
         tracker?.remove(pkg)
+    }
+
+    private fun openAppInfo(pkg: String) {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", pkg, null))
+                // A fresh task: joining a leftover Settings task stacks the page oddly and Back lands in it.
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            startActivity(intent)
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Could not open app info for $pkg", e)
+        }
     }
 
     private companion object {
