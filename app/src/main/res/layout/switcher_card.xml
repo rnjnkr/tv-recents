@@ -55,11 +55,15 @@
     </LinearLayout>
     </FrameLayout>
 
+    <!-- Per-side margins: a negative layout_margin shorthand is silently ignored. -->
     <FrameLayout
         android:id="@+id/card_glow"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_margin="-6dp"
+        android:layout_marginLeft="-5dp"
+        android:layout_marginTop="-5dp"
+        android:layout_marginRight="-5dp"
+        android:layout_marginBottom="-5dp"
         android:importantForAccessibility="noHideDescendants"
         android:visibility="invisible">
 
@@ -72,6 +76,6 @@
             android:id="@+id/card_ring"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_margin="3dp" />
+            android:layout_margin="2dp" />
     </FrameLayout>
 </view>

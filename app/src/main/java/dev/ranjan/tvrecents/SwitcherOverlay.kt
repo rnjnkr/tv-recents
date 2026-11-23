@@ -325,7 +325,7 @@ internal class SwitcherRoot(context: Context, attrs: AttributeSet) : FrameLayout
     }
 }
 
-/** Draws the animated focus ring and halo outside the card bounds. */
+/** Draws the animated focus ring and a thin halo just outside the card bounds. */
 internal class SwitcherCard(context: Context, attrs: AttributeSet) : FrameLayout(context, attrs) {
 
     lateinit var pkg: String
@@ -338,10 +338,9 @@ internal class SwitcherCard(context: Context, attrs: AttributeSet) : FrameLayout
         super.onFinishInflate()
         glow = findViewById(R.id.card_glow)
         content = findViewById(R.id.card_content)
-        // The card has 8dp corners. A stroke is centred on its path, so the ring's path radius is
-        // 8 + 3/2 (outer edge 11dp, flush with the card) and the halo's is 11 + 3/2.
-        findViewById<View>(R.id.card_ring).background = outline(3, 9.5f, 0xFFFFB300.toInt())
-        findViewById<View>(R.id.card_halo).background = outline(3, 12.5f, 0x55FFB300)
+        // Square cards; the 3dp ring sits flush outside the card edge, a thin 2dp halo outside it.
+        findViewById<View>(R.id.card_ring).background = outline(3, 0f, 0xFFFFB300.toInt())
+        findViewById<View>(R.id.card_halo).background = outline(2, 0f, 0x66FFB300)
     }
 
     override fun onFocusChanged(focused: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
@@ -384,7 +383,7 @@ internal class SwitcherCard(context: Context, attrs: AttributeSet) : FrameLayout
         if (raised && isAttachedToWindow) glow.visibility = View.VISIBLE
         if (focused && isAttachedToWindow) {
             glowAnimator = ObjectAnimator.ofFloat(glow, View.ALPHA, 1f, 0.55f).apply {
-                duration = 600L
+                duration = 1100L
                 interpolator = AccelerateDecelerateInterpolator()
                 repeatCount = ValueAnimator.INFINITE
                 repeatMode = ValueAnimator.REVERSE
