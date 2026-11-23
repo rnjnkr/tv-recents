@@ -28,7 +28,7 @@ class RecentsService : AccessibilityService(), HomeActions {
         clearSession()
         val facts = AndroidPackageFacts(this)
         tracker = RecentsTracker(PrefsMruStore(this), PackageRules(packageName, facts), facts)
-        overlay = SwitcherOverlay(this, ::launchApp, ::openAppInfo)
+        overlay = SwitcherOverlay(this, ::launchApp, ::openAppInfo, ::removeApp)
         registerDebugHomePress()
     }
 
@@ -77,7 +77,7 @@ class RecentsService : AccessibilityService(), HomeActions {
                 null
             }
         }
-        overlay.show(entries, tracker.initialFocusIndex(entries.map { it.pkg }))
+        overlay.show(entries, tracker.initialFocusIndex(entries.map { it.pkg })) { tracker.currentForeground }
     }
 
     override fun dismissSwitcher() {
@@ -176,6 +176,10 @@ class RecentsService : AccessibilityService(), HomeActions {
         } catch (e: RuntimeException) {
             Log.w(TAG, "Could not open app info for $pkg", e)
         }
+    }
+
+    private fun removeApp(pkg: String) {
+        tracker?.remove(pkg)
     }
 
     private companion object {

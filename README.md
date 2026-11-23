@@ -12,8 +12,8 @@ Google TV has no recents screen, so switching apps normally means Home, scroll t
 - **Hold Home (about half a second):** opens a translucent bar at the bottom of the screen with your recently used apps, most recent first (up to 8).
   - Left and right move between apps and wrap around at both ends.
   - OK opens the selected app, back where you left it if the app keeps its state.
-  - Hold OK on a card to get an **App info** chip beside it; OK on the chip opens that app's info page.
-  - Back closes the bar (or just the chip). It also closes by itself after 10 seconds without input.
+  - Hold OK on a card to open its menu. **App info** opens the app's system info page. Down moves to **Remove from list** (not shown for the app you're in).
+  - Back closes the bar (or just the menu). It also closes by itself after 10 seconds without input.
   - If you are inside an app, focus starts on the previous app, so "hold Home, OK" flips between your last two apps.
 
 The hold replaces Google TV's own long-press Home panel (settings, profiles, inputs), which is still reachable from the gear icon on the home screen.
@@ -27,10 +27,12 @@ The recents list is stored only on the TV: the app has no internet permission an
 
 ## Limits
 
-- **"Open apps" is approximated.** Android doesn't let an app list what is running, so the bar shows the apps you used recently, most recent first. An app you closed stays in the list until newer ones push it out.
+- **"Open apps" is approximated.** Android doesn't let an app list what is running, so the bar shows the apps you used recently, most recent first.
 - **The Home key must reach the app.** It works on a Sony BRAVIA (Android 12). Other accessibility services that grab the Home key, such as Button Mapper, can take it before this app sees it. Turn those off if the hold does nothing.
 - **Resuming** depends on the target app keeping its task; some apps cold-start.
 - Needs Android 9 (API 28) or newer.
+
+**Remove from list** only hides the card; it doesn't stop the app. Android doesn't let a regular app close other apps (the restriction applies on Android 12 TVs as well). The card returns, at the front, when you use the app again.
 
 ## Build from source
 

@@ -9,4 +9,5 @@
     <string name="key_filter_warning">May intercept remote buttons too: %1$s</string>
     <string name="no_recent_apps">No recent apps yet</string>
     <string name="app_info">App info</string>
+    <string name="remove_from_list">Remove from list</string>
 </resources>

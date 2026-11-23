@@ -35,14 +35,16 @@ class SwitcherOverlay(
     service: AccessibilityService,
     private val onPick: (String) -> Unit,
     private val onAppInfo: (String) -> Unit,
+    private val onRemove: (String) -> Unit,
 ) {
 
     private val windowManager = service.getSystemService(WindowManager::class.java)
     private val inflater = LayoutInflater.from(service)
     private var root: SwitcherRoot? = null
     private var focusTarget: View? = null
-    private var appInfoCard: SwitcherCard? = null
-    private var chipDownTime: Long? = null
+    private var menuCard: SwitcherCard? = null
+    private var menuPress: Pair<Int, Long>? = null
+    private var foregroundPkg: () -> String? = { null }
     private val handler = Handler(Looper.getMainLooper())
     private val okPressTracker = OkPressTracker(::schedule, object : OkActions {
         override fun onShortPress() {
@@ -52,7 +54,7 @@ class SwitcherOverlay(
         override fun onLongPress() {
             val content = root ?: return
             val card = content.findFocus() as? SwitcherCard ?: return
-            if (card.isAttachedToWindow) showAppInfo(content, card)
+            if (card.isAttachedToWindow) showMenu(content, card)
         }
     })
     private val autoDismiss = Runnable {
@@ -68,45 +70,36 @@ class SwitcherOverlay(
     }
 
     /** Focuses the root when focusIndex is -1 or there are no entries. */
-    fun show(entries: List<AppEntry>, focusIndex: Int) {
+    fun show(entries: List<AppEntry>, focusIndex: Int, foregroundPkg: () -> String?) {
         resetPresses()
-        closeAppInfo()
+        closeMenu()
+        this.foregroundPkg = foregroundPkg
         val existing = root
         val content = existing ?: (inflater.inflate(R.layout.switcher, null) as SwitcherRoot).apply {
             onBack = back@{
                 if (root !== this) return@back
-                val card = appInfoCard
-                if (card == null) dismiss() else closeAppInfo(card)
+                val card = menuCard
+                if (card == null) dismiss() else closeMenu(card)
             }
             onKey = { if (root === this) restartIdleTimer() }
             onOk = { if (root === this) onOkKey(it) }
+            onDirection = { root === this && onMenuDirection(this, it) }
             onFocusChanged = focus@{ focused ->
                 if (root !== this) return@focus
                 resetPresses()
-                if (appInfoCard != null && focused !== appInfoChip) closeAppInfo()
+                if (menuCard != null && focused !== appInfoRow && focused !== removeRow) closeMenu()
             }
-            appInfoChip.setOnKeyListener { _, keyCode, event ->
-                if (root !== this) return@setOnKeyListener false
-                when (keyCode) {
-                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                        if (event.action == KeyEvent.ACTION_DOWN) moveFromAppInfo(keyCode)
-                        true
-                    }
-                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> true
-                    else -> false
-                }
+            menu.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                if (root === this) menuCard?.let { positionMenu(this, it) }
             }
             findViewById<View>(R.id.switcher_scroll).setOnScrollChangeListener { _, _, _, _, _ ->
-                if (root === this) appInfoCard?.let { positionAppInfo(this, it) }
+                if (root === this) menuCard?.let { positionMenu(this, it) }
             }
         }
         val cards = content.findViewById<LinearLayout>(R.id.switcher_cards)
         cards.removeAllViews()
         entries.forEach { cards.addView(createCard(cards, it)) }
-        content.findViewById<View>(R.id.switcher_scroll).visibility =
-            if (entries.isEmpty()) View.GONE else View.VISIBLE
-        content.findViewById<View>(R.id.switcher_empty).visibility =
-            if (entries.isEmpty()) View.VISIBLE else View.GONE
+        content.setEmpty(entries.isEmpty())
 
         if (existing == null) {
             val params = WindowManager.LayoutParams(
@@ -139,10 +132,11 @@ class SwitcherOverlay(
     fun dismiss() {
         val content = root ?: return
         resetPresses()
-        closeAppInfo()
+        closeMenu()
         (content.findFocus() as? SwitcherCard)?.stopGlow()
         root = null
         focusTarget = null
+        foregroundPkg = { null }
         handler.removeCallbacks(autoDismiss)
         try {
             windowManager.removeView(content)
@@ -174,7 +168,7 @@ class SwitcherOverlay(
 
     private fun resetPresses() {
         okPressTracker.reset()
-        chipDownTime = null
+        menuPress = null
     }
 
     private fun onOkKey(event: KeyEvent) {
@@ -184,35 +178,64 @@ class SwitcherOverlay(
             okPressTracker.onKey(
                 event.action, event.repeatCount, event.downTime, event.eventTime, event.isCanceled,
             )
-        } else if (focused === content.appInfoChip) {
-            // The release that opened the chip belongs to the card's press.
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                chipDownTime = event.downTime
-            } else if (event.action == KeyEvent.ACTION_UP && chipDownTime == event.downTime) {
-                chipDownTime = null
-                val card = appInfoCard
-                if (!event.isCanceled && card != null) {
+        } else {
+            val card = menuCard ?: return
+            // The release that opened the menu belongs to the card's press.
+            if (!menuPressReleased(event)) return
+            when (focused) {
+                content.appInfoRow -> {
                     dismiss()
                     onAppInfo(card.pkg)
+                }
+                content.removeRow -> {
+                    if (canRemoveCard(card.pkg, foregroundPkg())) removeCard(content, card)
+                    else showMenu(content, card)
                 }
             }
         }
     }
 
-    private fun showAppInfo(content: SwitcherRoot, card: SwitcherCard) {
-        appInfoCard = card
-        val chip = content.appInfoChip
-        chip.visibility = View.VISIBLE
-        if (chip.requestFocus()) {
+    private fun menuPressReleased(event: KeyEvent): Boolean {
+        val press = event.keyCode to event.downTime
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            menuPress = press
+        } else if (event.action == KeyEvent.ACTION_UP && menuPress == press) {
+            menuPress = null
+            return !event.isCanceled
+        }
+        return false
+    }
+
+    private fun onMenuDirection(content: SwitcherRoot, event: KeyEvent): Boolean {
+        val card = menuCard ?: return false
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (event.action == KeyEvent.ACTION_DOWN) moveFromMenu(card, event.keyCode)
+            }
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (menuPressReleased(event)) {
+                    if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) content.appInfoRow.requestFocus()
+                    else if (content.removeRow.visibility == View.VISIBLE) content.removeRow.requestFocus()
+                }
+            }
+        }
+        return true
+    }
+
+    private fun showMenu(content: SwitcherRoot, card: SwitcherCard) {
+        menuCard = card
+        content.menu.visibility = View.VISIBLE
+        if (content.appInfoRow.requestFocus()) {
+            content.removeRow.visibility = if (canRemoveCard(card.pkg, foregroundPkg())) View.VISIBLE else View.GONE
             card.markSource(true)
-            positionAppInfo(content, card)
+            positionMenu(content, card)
         } else {
-            closeAppInfo()
+            closeMenu()
         }
     }
 
-    private fun positionAppInfo(content: SwitcherRoot, card: SwitcherCard) {
-        val chip = content.appInfoChip
+    private fun positionMenu(content: SwitcherRoot, card: SwitcherCard) {
+        val menu = content.menu
         val cardPosition = IntArray(2)
         val rootPosition = IntArray(2)
         card.getLocationInWindow(cardPosition)
@@ -221,30 +244,43 @@ class SwitcherOverlay(
         val cardLeft = cardPosition[0] - rootPosition[0]
         val cardTop = cardPosition[1] - rootPosition[1]
         val right = cardLeft + card.width + gap
-        val maxX = (content.width - chip.width).coerceAtLeast(0)
-        val maxY = (content.height - chip.height).coerceAtLeast(0)
-        val x = if (right <= maxX) right else cardLeft - gap - chip.width
-        val y = cardTop + (card.height - chip.height) / 2
-        chip.translationX = (x.coerceIn(0, maxX) - chip.left).toFloat()
-        chip.translationY = (y.coerceIn(0, maxY) - chip.top).toFloat()
+        val maxX = (content.width - menu.width).coerceAtLeast(0)
+        val maxY = (content.height - menu.height).coerceAtLeast(0)
+        val x = if (right <= maxX) right else cardLeft - gap - menu.width
+        val y = cardTop + (card.height - menu.height) / 2
+        menu.translationX = (x.coerceIn(0, maxX) - menu.left).toFloat()
+        menu.translationY = (y.coerceIn(0, maxY) - menu.top).toFloat()
     }
 
-    private fun closeAppInfo(target: View? = null) {
-        val source = appInfoCard ?: return
-        appInfoCard = null
-        chipDownTime = null
+    private fun closeMenu(target: View? = null) {
+        val source = menuCard ?: return
+        menuCard = null
+        menuPress = null
         source.markSource(false)
         target?.requestFocus()
-        root?.appInfoChip?.visibility = View.INVISIBLE
+        root?.let {
+            it.menu.visibility = View.INVISIBLE
+            it.removeRow.visibility = View.GONE
+        }
     }
 
-    private fun moveFromAppInfo(keyCode: Int) {
-        val card = appInfoCard ?: return
+    private fun moveFromMenu(card: SwitcherCard, keyCode: Int) {
         val parent = card.parent as LinearLayout
         val index = parent.indexOfChild(card)
         val step = if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) -1 else 1
         val target = (index + step + parent.childCount) % parent.childCount
-        closeAppInfo(parent.getChildAt(target))
+        closeMenu(parent.getChildAt(target))
+    }
+
+    private fun removeCard(content: SwitcherRoot, card: SwitcherCard) {
+        onRemove(card.pkg)
+        val cards = card.parent as LinearLayout
+        val index = cards.indexOfChild(card)
+        cards.removeViewAt(index)
+        val target = cards.getChildAt(focusIndexAfterRemoval(index, cards.childCount)) ?: content
+        focusTarget = target
+        closeMenu(target)
+        content.setEmpty(cards.childCount == 0)
     }
 
     private fun createCard(parent: LinearLayout, entry: AppEntry): View =
@@ -284,19 +320,36 @@ class SwitcherOverlay(
         }
 }
 
-/** Consumes Back and OK before they reach any child. */
+internal fun canRemoveCard(pkg: String, foregroundPkg: String?): Boolean = pkg != foregroundPkg
+
+internal fun focusIndexAfterRemoval(removedIndex: Int, remainingCount: Int): Int =
+    minOf(removedIndex, remainingCount - 1)
+
+/** Handles switcher keys before they reach any child. */
 internal class SwitcherRoot(context: Context, attrs: AttributeSet) : FrameLayout(context, attrs) {
 
     var onBack: (() -> Unit)? = null
     var onKey: (() -> Unit)? = null
     var onOk: ((KeyEvent) -> Unit)? = null
+    var onDirection: ((KeyEvent) -> Boolean)? = null
     var onFocusChanged: ((View?) -> Unit)? = null
     private val focusListener = ViewTreeObserver.OnGlobalFocusChangeListener { _, focused ->
         onFocusChanged?.invoke(focused)
     }
 
-    val appInfoChip: View
+    val menu: View
+        get() = findViewById(R.id.switcher_menu)
+
+    val appInfoRow: View
         get() = findViewById(R.id.switcher_app_info)
+
+    val removeRow: View
+        get() = findViewById(R.id.switcher_remove)
+
+    fun setEmpty(empty: Boolean) {
+        findViewById<View>(R.id.switcher_scroll).visibility = if (empty) View.GONE else View.VISIBLE
+        findViewById<View>(R.id.switcher_empty).visibility = if (empty) View.VISIBLE else View.GONE
+    }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         onKey?.invoke()
@@ -309,6 +362,9 @@ internal class SwitcherRoot(context: Context, attrs: AttributeSet) : FrameLayout
                 onOk?.invoke(event)
                 true
             }
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN ->
+                onDirection?.invoke(event) == true || super.dispatchKeyEvent(event)
             else -> super.dispatchKeyEvent(event)
         }
     }
@@ -325,7 +381,7 @@ internal class SwitcherRoot(context: Context, attrs: AttributeSet) : FrameLayout
     }
 }
 
-/** Draws the animated focus ring and a thin halo just outside the card bounds. */
+/** Draws the animated focus ring just outside the card bounds. */
 internal class SwitcherCard(context: Context, attrs: AttributeSet) : FrameLayout(context, attrs) {
 
     lateinit var pkg: String
@@ -338,9 +394,8 @@ internal class SwitcherCard(context: Context, attrs: AttributeSet) : FrameLayout
         super.onFinishInflate()
         glow = findViewById(R.id.card_glow)
         content = findViewById(R.id.card_content)
-        // Square cards; the 3dp ring sits flush outside the card edge, a thin 2dp halo outside it.
-        findViewById<View>(R.id.card_ring).background = outline(3, 0f, 0xFFFFB300.toInt())
-        findViewById<View>(R.id.card_halo).background = outline(2, 0f, 0x66FFB300)
+        // Square cards; the 3dp ring sits flush outside the card edge.
+        findViewById<View>(R.id.card_ring).background = outline(3, 0f, 0xFF0A84FF.toInt())
     }
 
     override fun onFocusChanged(focused: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
@@ -365,7 +420,7 @@ internal class SwitcherCard(context: Context, attrs: AttributeSet) : FrameLayout
         glow.visibility = View.INVISIBLE
     }
 
-    /** Keeps the card lit, with a steady ring, while its App info chip has the focus. */
+    /** Keeps the card lit, with a steady ring, while its menu has the focus. */
     fun markSource(on: Boolean) {
         isSource = on
         updateHighlight(isFocused)
